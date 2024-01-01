@@ -1,6 +1,6 @@
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from "firebase-admin/firestore";
-import { collection, getDocs } from "firebase/firestore";
+import { and, collection, getDocs } from "firebase/firestore";
 import express, { json } from "express";
 const app = express();
 
@@ -23,175 +23,163 @@ app.use(json());
 
 app.get("/getRegions", async (req, res) => {
   try {
-    const regions = await db.listCollections();
-    const regionNames = regions.map((region) => region.id);
-    res.send({ regions: regionNames });
+    const fieldName = 'region';
+    const mainCollectionRef = db.collection('Master');
+    const result = [];
+    
+    // Use where clause to filter documents in the main collection
+    const querySnapshot = await mainCollectionRef
+      .where(fieldName, '!=', null)  // Filter documents where 'regions' is present
+      .get();
+
+    // Iterate over the documents in the main collection
+    querySnapshot.forEach(doc => {
+      // Access the 'regions' field of each document
+      const regionsArray = doc.data()[fieldName];
+      if (Array.isArray(regionsArray)) {
+        // If 'regions' is an array, push its elements to the result array
+        result.push(...regionsArray);
+      }
+    });
+
+    res.send({ regions: result});
   } catch (error) {
     console.error('Error fetching regions:', error);
     res.status(500).send({ 'Message': 'Error fetching regions' });
   }
 });
 
+
+app.get("/getTech", async (req, res) => {
+  try {
+    const fieldName = 'technology';
+    const mainCollectionRef = db.collection('Master');
+    const result = [];
+    
+    // Use where clause to filter documents in the main collection
+    const querySnapshot = await mainCollectionRef
+      .where(fieldName, '!=', null)  // Filter documents where 'regions' is present
+      .get();
+
+    // Iterate over the documents in the main collection
+    querySnapshot.forEach(doc => {
+      // Access the 'regions' field of each document
+      const regionsArray = doc.data()[fieldName];
+      if (Array.isArray(regionsArray)) {
+        // If 'regions' is an array, push its elements to the result array
+        result.push(...regionsArray);
+      }
+    });
+
+    res.send({ technologies: result});
+  } catch (error) {
+    console.error('Error fetching regions:', error);
+    res.status(500).send({ 'Message': 'Error fetching regions' });
+  }
+});
+
+
+//only region parameter
+const mainCollectionRef = db.collection('Contracts');
+const fieldName = 'region';
+
 app.get("/getDocuments/:region", async (req, res) => {
   try {
-    const documents = await db.collection(req.params.region).listDocuments();
-    const documentIds = documents.map((doc) => doc.id);
-    res.send({ documents: documentIds });
+    const result = [];//array
+    console.log(req.params.region)
+    // Get all documents from the main collection
+    const querySnapshot = await mainCollectionRef.get();
+    // Iterate over the documents in the main collection
+    querySnapshot.forEach(doc => {
+      // Check if the specified field exists in the document
+      if (doc.exists && doc.data().hasOwnProperty(fieldName) && doc.data()[fieldName] === req.params.region) {
+        // Access the fields of each document
+        const docData = doc.data();
+        result.push(docData);
+      }
+    });
+
+    res.send({ documents: result });
   } catch (error) {
     console.error('Error fetching documents:', error);
     res.status(500).send({ 'Message': 'Error fetching documents, regions' });
   }
 });
 
-app.get("/getAllDocumentNames", async (req, res) => {
+//only technology parameter
+app.get("/getDocumentsbytech/:technology", async (req, res) => {
   try {
-    const regionsSnapshot = await db.listCollections();//regionname
-    const regions = regionsSnapshot.map((doc) => doc.id);//maps and stores it in regions
-
-    const allDocumentNames = [];
-
-    for (const region of regions) {
-      const regionRef = db.collection(region);
-      const documentsSnapshot = await regionRef.get();
-
-      const documentNames = documentsSnapshot.docs.map(doc => doc.id);
-
-      for (const docName of documentNames) {
-        if (!allDocumentNames.includes(docName)) {
-          allDocumentNames.push(docName);
-        }
+    const techfieldName = 'technology';
+    const _mainCollectionRef = db.collection('Contracts');
+    const technologyresult = [];
+    console.log(req.params.technology)
+    const technologyquerySnapshot = await _mainCollectionRef.get();
+    technologyquerySnapshot.forEach(doc => {
+      if (doc.exists && doc.data().hasOwnProperty(techfieldName) 
+      && doc.data()[techfieldName] === req.params.technology) 
+    {
+        // Access the fields of each document
+        const docData = doc.data();
+        technologyresult.push(docData);
       }
-    }
-
-    res.send({ allDocumentNames });
+    });
+    res.send({ documents: technologyresult });
   } catch (error) {
-    console.error('Error fetching all document names:', error);
-    res.status(500).send({ 'Message': 'Error fetching all document names' });
+    console.error('Error fetching documents:', error);
+    res.status(500).send({ 'Message': 'Error fetching documents, regions' });
   }
-});
+})
 
-
-app.get("/getCollectionsByTechnology/:technology", async (req, res) => {
+// region and technology parameters
+app.get("/getDocumentsbyplantstech/:region/:technology/", async (req, res) => {
   try {
-    const tech = req.params.technology;
-    const regionsSnapshot = await db.listCollections();
-    const regions = regionsSnapshot.map((doc) => doc.id);
+    const bothresult = [];
+    const regionFieldName = 'region';
+    const technologyFieldName = 'technology';
 
-    const foundDocuments = [];
+    // Use where clause to filter documents in the main collection
+    const bothQuerySnapshot = await mainCollectionRef
+      .where(regionFieldName, '==', req.params.region)
+      .where(technologyFieldName, '==', req.params.technology)
+      .get();
 
-    for (const region of regions) {
-      const regionRef = db.collection(region);
-      const documentsSnapshot = await regionRef.get();
+    // Iterate over the documents in the main collection
+    bothQuerySnapshot.forEach(doc => {
+      // Access the fields of each document
+      const docData = doc.data();
+      bothresult.push(docData);
+    });
 
-      const documentNames = documentsSnapshot.docs.map(doc => doc.id);
-
-      for (const docName of documentNames) {
-        if (docName === tech.substring(1)) {
-
-          // List collections inside the matched document
-          const docRef = regionRef.doc(docName);
-          const collections = await docRef.listCollections();
-
-          for (const collection of collections) {
-            const colRef = docRef.collection(collection.id);
-            const documents = await colRef.get();
-
-            const documentsData = documents.docs.map(doc => doc.data());
-
-            foundDocuments.push({
-              region,
-              documentName: docName,
-              collection: {
-                id: collection.id,
-                name: collection.id, 
-                data: documentsData,
-              },
-            });
-          }
-        }
-      }
-    }
-
-    res.send({ foundDocuments });
+    res.send({ documents: bothresult });
   } catch (error) {
-    console.error('Error fetching collections by technology:', error);
-    res.status(500).send({ 'Message': 'Error fetching collections by technology' });
+    console.error('Error fetching documents:', error);
+    res.status(500).send({ 'Message': 'Error fetching documents, regions' });
   }
 });
 
-
-
-
-
-app.get("/getCollectionss/:region/", async (req, res) => {
+//all the data in the db collection
+// Retrieve all documents in the "Contracts" collection
+app.get("/getAllDocuments", async (req, res) => {
   try {
-    const regionRef = db.collection(req.params.region);
-    const regionDocs = await regionRef.get();
-    //get the documents inside the region
+    const allResult = [];
 
-    const field = [];
+    // Retrieve all documents in the main collection
+    const allQuerySnapshot = await mainCollectionRef.get();
 
-    for (const doc of regionDocs.docs) {
-      const docRef = regionRef.doc(doc.id);
-      const collections = await docRef.listCollections();
+    // Iterate over the documents in the main collection
+    allQuerySnapshot.forEach(doc => {
+      // Access the fields of each document
+      const docData = doc.data();
+      allResult.push(docData);
+    });
 
-      for (const collection of collections) {
-        //it is iterating over each collection inside the documents - solar and wind for example
-        const colRef = docRef.collection(collection.id);
-        const documents = await colRef.get();
-        //gets the documents inside that particular collection with .get() function
-        const documentsData = [];
-        documents.forEach((doc) => {
-          documentsData.push(doc.data());
-        });
-
-        field.push({
-          documentId: doc.id,
-          collectionId: collection.id,
-          data: documentsData,
-        });
-      }
-    }
-
-    res.send({ collections: field });
+    res.send({ documents: allResult });
   } catch (error) {
-    console.error('Error fetching collections:', error);
-    res.status(500).send({ 'Message': 'Error fetching collections' });
+    console.error('Error fetching documents:', error);
+    res.status(500).send({ 'Message': 'Error fetching documents' });
   }
 });
 
-app.get("/getCollections/:region/:document/", async (req, res) => {
-  try {
-    const sfRef = db.collection(req.params.region).doc(req.params.document);
-    const collections = await sfRef.listCollections();
-    const field = [];
-
-    for (const collection of collections) {
-      // Iterate over each collection inside the document (e.g., solar and wind)
-      const colRef = sfRef.collection(collection.id);
-      const documents = await colRef.get();
-      //get function is used to get documents inside a collection
-
-      const documentsData = [];
-
-      documents.forEach((doc) => {
-        // Iterate over each document inside the collection
-        documentsData.push(doc.data());
-      });
-
-      field.push({
-        documentId: req.params.document,
-        collectionId: collection.id,
-        data: documentsData,
-      });
-    }
-
-    res.send({ collections: field });
-  } catch (error) {
-    console.error('Error fetching collections:', error);
-    res.status(500).send({ 'Message': 'Error fetching collections' });
-  }
-});
 
 
 // Start the Express app
