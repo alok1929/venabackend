@@ -164,7 +164,7 @@ app.get("/getAllDocuments", async (req, res) => {
     const allResult = [];
 
     // Retrieve all documents in the main collection
-    const allQuerySnapshot = await mainCollectionRef.get();
+    const allQuerySnapshot = await mainCollectionRef.get(); 
 
     // Iterate over the documents in the main collection
     allQuerySnapshot.forEach(doc => {
